@@ -2,6 +2,8 @@ use std::io::{Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream};
 use std::fs::File;
 
+mod responses;
+
 fn main() {
     // Unwrap seems a sensible choice here, as a panic is appropriate if the port is not
     // available
@@ -49,7 +51,7 @@ fn handle_client(stream : TcpStream) {
         target_file = "/index"
     }
 
-    println!("Target file ---- {:?}", vec[1]);
+    println!("Target file ---- {:?}", target_file);
     send_response(reader.into_inner(), target_file);
 }
 
@@ -57,17 +59,21 @@ fn send_response(mut stream: TcpStream, target_file: &str) {
     // TODO: Learn more about the questionmark operator. I understand it is error handling sugar
     // and unwrap is lazyness, but matching types is cumbersome
     let target_path = "demo_site".to_string() + target_file + ".html";
+
     match File::open(target_path) {
         Ok(file) => {
+            stream.write("HTTP/1.1 OK\n\n".to_string().as_bytes()).unwrap();
             let mut buf_reader = BufReader::new(file);
-            let mut contents = String::new();
-            buf_reader.read_to_string(&mut contents).unwrap();
+            let lines = buf_reader.by_ref().lines();
 
-            let response = "HTTP/1.1 OK\n\n".to_string() + &contents;
-            stream.write_all(response.as_bytes()).unwrap();
+            for line in lines {
+                let line_val = line.unwrap();
+                println!("The response line is ---- {:?}", line_val);
+                stream.write(line_val.as_bytes()).unwrap();
+            }
         }
-        Err(e) => {
-            let response = "HTTP/1.1 404\n\n<h1>Page not found!</h1>";
+        _ => {
+            let response = responses::not_found();
             stream.write_all(response.as_bytes()).unwrap();
         }
     }
