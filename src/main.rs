@@ -1,19 +1,23 @@
+extern crate yaml_rust;
+
 use std::io::{Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream};
 use std::fs::File;
+use std::collections::BTreeMap;
+use yaml_rust::{Yaml};
 
 mod responses;
+mod config_loader;
 
 fn main() {
-    // Unwrap seems a sensible choice here, as a panic is appropriate if the port is not
-    // available
+    let config = config_loader::load();
     let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
     println!("Server listening on Port 8080");
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_client(stream);
+                handle_client(stream, config.to_vec());
             }
             Err(e) =>  {
                 println!("Connection failed! What to do... {:?}", e);
@@ -22,8 +26,14 @@ fn main() {
     }
 }
 
-fn handle_client(stream : TcpStream) {
+fn handle_client<'a>(stream: TcpStream, config: Vec<Yaml>) {
     let mut reader = BufReader::new(stream);
+
+    let doc = &config[0];
+
+    // This is okay, but how do we loop over root keys to obtain all servers
+    println!("Some server info... {:?}", doc["server_one"]["port"].as_i64().unwrap());
+    println!("Some server info... {:?}", doc["server_two"]["port"].as_i64().unwrap());
 
     // This block creates a scope such that we can borrow from reader
     let path = {
