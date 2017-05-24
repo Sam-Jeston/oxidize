@@ -1,0 +1,14 @@
+[
+  {
+    "port": 4000,
+    "source": "/Users/samjeston/Projects/rust/oxidize/demo_site",
+    "root": "/",
+    "base": "index.html"
+  },
+  {
+    "port": 4555,
+    "source": "/Users/samjeston/Projects/rust/oxidize/demo_site",
+    "root": "/",
+    "base": "index.html"
+  }
+]

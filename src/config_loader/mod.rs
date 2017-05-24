@@ -1,7 +1,15 @@
-use yaml_rust::{YamlLoader, Yaml};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use serde_json;
+
+#[derive(Serialize, Deserialize)]
+pub struct ServerBlock {
+    port: u32,
+    source: String,
+    root: String,
+    base: String
+}
 
 fn read_file(file_path: String) -> String {
     match File::open(file_path) {
@@ -16,21 +24,26 @@ fn read_file(file_path: String) -> String {
     }
 }
 
-fn yaml_parser(yaml: String) -> Vec<Yaml> {
-    let yaml_str_ref = yaml.as_str();
-    YamlLoader::load_from_str(yaml_str_ref).unwrap()
+fn json_parser(json: String) -> Vec<ServerBlock> {
+    let json_result: Vec<ServerBlock> = serde_json::from_str(json.as_str()).unwrap();
+
+    for j in &json_result {
+        println!("Our first server port is {} with base file of {}", j.port, j.base);
+    }
+
+    json_result
 }
 
-pub fn load () -> Vec<Yaml> {
+pub fn load () -> Vec<ServerBlock> {
     let config_key = "OXIDIZE_CONFIG";
     match env::var_os(config_key) {
         Some(val) => {
             let file_string = read_file(val.into_string().unwrap());
-            yaml_parser(file_string)
+            json_parser(file_string)
         }
         None => {
-            let file_string = read_file("src/config_loader/default.yml".to_string());
-            yaml_parser(file_string)
+            let file_string = read_file("src/config_loader/default.json".to_string());
+            json_parser(file_string)
         }
     }
 }

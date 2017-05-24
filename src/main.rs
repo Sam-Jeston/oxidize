@@ -1,10 +1,14 @@
-extern crate yaml_rust;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
 
 use std::io::{Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream};
 use std::fs::File;
 use std::collections::BTreeMap;
-use yaml_rust::{Yaml};
+use config_loader::ServerBlock;
 
 mod responses;
 mod config_loader;
@@ -17,7 +21,7 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_client(stream, config.to_vec());
+                handle_client(stream, &config);
             }
             Err(e) =>  {
                 println!("Connection failed! What to do... {:?}", e);
@@ -26,14 +30,8 @@ fn main() {
     }
 }
 
-fn handle_client<'a>(stream: TcpStream, config: Vec<Yaml>) {
+fn handle_client<'a>(stream: TcpStream, config: &Vec<ServerBlock>) {
     let mut reader = BufReader::new(stream);
-
-    let doc = &config[0];
-
-    // This is okay, but how do we loop over root keys to obtain all servers
-    println!("Some server info... {:?}", doc["server_one"]["port"].as_i64().unwrap());
-    println!("Some server info... {:?}", doc["server_two"]["port"].as_i64().unwrap());
 
     // This block creates a scope such that we can borrow from reader
     let path = {
