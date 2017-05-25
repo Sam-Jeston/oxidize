@@ -62,16 +62,18 @@ fn accumlated_server_blocks(blocks: Vec<ServerBlock>) -> Vec<AccumulatedServerBl
     base_accumulator
 }
 
-pub fn load () -> Vec<ServerBlock> {
+pub fn load () -> Vec<AccumulatedServerBlock> {
     let config_key = "OXIDIZE_CONFIG";
     match env::var_os(config_key) {
         Some(val) => {
             let file_string = read_file(val.into_string().unwrap());
-            json_parser(file_string)
+            let raw_blocks = json_parser(file_string);
+            accumlated_server_blocks(raw_blocks)
         }
         None => {
             let file_string = read_file("src/config_loader/default.json".to_string());
-            json_parser(file_string)
+            let raw_blocks = json_parser(file_string);
+            accumlated_server_blocks(raw_blocks)
         }
     }
 }

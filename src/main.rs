@@ -7,8 +7,7 @@ extern crate serde_derive;
 use std::io::{Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream};
 use std::fs::File;
-use std::collections::BTreeMap;
-use config_loader::ServerBlock;
+use config_loader::{AccumulatedServerBlock};
 
 mod responses;
 mod config_loader;
@@ -30,7 +29,7 @@ fn main() {
     }
 }
 
-fn handle_client<'a>(stream: TcpStream, config: &Vec<ServerBlock>) {
+fn handle_client<'a>(stream: TcpStream, config: &Vec<AccumulatedServerBlock>) {
     let mut reader = BufReader::new(stream);
 
     // This block creates a scope such that we can borrow from reader

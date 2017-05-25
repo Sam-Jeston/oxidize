@@ -1,7 +1,0 @@
-server_one:
-  port: 4000
-  source: '/Users/samjeston/Projects/rust/oxidize/demo_site'
-  root: '/'
-  base_file: 'index.html'
-server_two:
-  port: 6000
