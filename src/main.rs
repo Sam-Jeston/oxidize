@@ -7,29 +7,44 @@ extern crate serde_derive;
 use std::io::{Read, Write, BufReader, BufRead};
 use std::net::{TcpListener, TcpStream};
 use std::fs::File;
-use config_loader::{AccumulatedServerBlock};
+use config_loader::server_block::{AccumulatedServerBlock};
+use std::thread;
 
 mod responses;
 mod config_loader;
 
 fn main() {
-    let config = config_loader::load();
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    println!("Server listening on Port 8080");
+    let accumulated_server_blocks = config_loader::load();
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                handle_client(stream, &config);
+    let mut children = vec![];
+
+    for block in accumulated_server_blocks {
+        children.push(thread::Builder::new().name("Oxidize-Server-Port-".to_string() + block.port.to_string().as_str())
+            .spawn(move || {
+                let bind_address = "127.0.0.1:".to_string() + block.port.to_string().as_str();
+                let listener = TcpListener::bind(&bind_address).unwrap();
+                println!("Server listening on Port {}", bind_address);
+
+                for stream in listener.incoming() {
+                    match stream {
+                        Ok(stream) => {
+                            handle_client(stream, &block);
+                        }
+                        Err(e) =>  {
+                            println!("Connection failed! What to do... {:?}", e);
+                        }
+                    }
+                }
             }
-            Err(e) =>  {
-                println!("Connection failed! What to do... {:?}", e);
-            }
-        }
+        ).unwrap());
+    }
+
+    for child in children {
+        let _ = child.join();
     }
 }
 
-fn handle_client<'a>(stream: TcpStream, config: &Vec<AccumulatedServerBlock>) {
+fn handle_client<'a>(stream: TcpStream, config: &AccumulatedServerBlock) {
     let mut reader = BufReader::new(stream);
 
     // This block creates a scope such that we can borrow from reader
