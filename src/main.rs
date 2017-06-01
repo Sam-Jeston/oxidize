@@ -10,7 +10,7 @@ use std::fs::File;
 use config_loader::server_block::{AccumulatedServerBlock};
 use std::thread;
 
-mod responses;
+mod response;
 mod config_loader;
 
 fn main() {
@@ -50,15 +50,38 @@ fn handle_client<'a>(stream: TcpStream, config: &AccumulatedServerBlock) {
     // This block creates a scope such that we can borrow from reader
     let path = {
         let mut line_iterator = reader.by_ref().lines();
-        let first_line = line_iterator.next().unwrap().unwrap();
-        println!("The first line is ---- {:?}", first_line);
+
+        let first_line_opt = match line_iterator.next() {
+            Some(line) => {
+                match line {
+                    Ok(target_line) => Some(target_line),
+                    // Maybe We want to panic here
+                    Err(_) => None
+                }
+            }
+            None => {
+                println!("No more lines :)");
+                None
+            }
+        };
+
+        let first_line = match first_line_opt {
+            Some(line) => line,
+            None => "".to_string()
+        };
 
         // Just print the remaining lines for now
         for line in line_iterator {
-            let line_val = line.unwrap();
-            println!("The line is ---- {:?}", line_val);
-            if line_val == "" {
-                break;
+            match line {
+                Ok(line_val) => {
+                    println!("The line is ---- {:?}", line_val);
+                    if line_val == "" {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    println!("Line iterator error {:?}", e)
+                }
             }
         }
 
@@ -78,25 +101,31 @@ fn handle_client<'a>(stream: TcpStream, config: &AccumulatedServerBlock) {
 }
 
 fn send_response(mut stream: TcpStream, target_file: &str) {
-    // TODO: Learn more about the questionmark operator. I understand it is error handling sugar
-    // and unwrap is lazyness, but matching types is cumbersome
     let target_path = "demo_site".to_string() + target_file + ".html";
 
     match File::open(target_path) {
         Ok(file) => {
-            stream.write("HTTP/1.1 OK\n\n".to_string().as_bytes()).unwrap();
-            let mut buf_reader = BufReader::new(file);
-            let lines = buf_reader.by_ref().lines();
+            match stream.write("HTTP/1.1 OK\n\n".to_string().as_bytes()) {
+                Ok(_) => {
+                    let mut buf_reader = BufReader::new(file);
+                    let lines = buf_reader.by_ref().lines();
 
-            for line in lines {
-                let line_val = line.unwrap();
-                println!("The response line is ---- {:?}", line_val);
-                stream.write(line_val.as_bytes()).unwrap();
-            }
+                    for line in lines {
+                        match line {
+                            Ok(line_val) => {
+                                println!("The response line is ---- {:?}", line_val);
+                                let _ = stream.write(line_val.as_bytes());
+                            },
+                            Err(_) => panic!("Error writing file to res")
+                        }
+                    }
+                },
+                Err(_) => panic!("Failed to write to response")
+            };
         }
         _ => {
-            let response = responses::not_found();
-            stream.write_all(response.as_bytes()).unwrap();
+            let response = response::not_found();
+            let _ = stream.write_all(response.as_bytes());
         }
     }
 }
