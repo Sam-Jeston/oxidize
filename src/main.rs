@@ -1,5 +1,6 @@
 extern crate serde;
 extern crate serde_json;
+extern crate hyper;
 
 #[macro_use]
 extern crate serde_derive;
@@ -9,9 +10,25 @@ use std::net::{TcpListener, TcpStream};
 use std::fs::File;
 use config_loader::server_block::{AccumulatedServerBlock};
 use std::thread;
+use hyper::server::{Server, Request, Response};
+use hyper::status::StatusCode;
+use hyper::uri::RequestUri::{AbsolutePath};
 
 mod response;
 mod config_loader;
+
+fn request_handler (req: Request, mut res: Response) {
+    let uri = req.uri;
+
+    let path = match uri {
+        AbsolutePath(x) => x,
+        _ => "".to_string()
+    };
+
+    println!("path {:?}", path);
+
+    *res.status_mut() = StatusCode::Ok
+}
 
 fn main() {
     let accumulated_server_blocks = config_loader::load();
@@ -21,20 +38,21 @@ fn main() {
     for block in accumulated_server_blocks {
         children.push(thread::Builder::new().name("Oxidize-Server-Port-".to_string() + block.port.to_string().as_str())
             .spawn(move || {
-                let bind_address = "127.0.0.1:".to_string() + block.port.to_string().as_str();
-                let listener = TcpListener::bind(&bind_address).unwrap();
-                println!("Server listening on Port {}", bind_address);
-
-                for stream in listener.incoming() {
-                    match stream {
-                        Ok(stream) => {
-                            handle_client(stream, &block);
-                        }
-                        Err(e) =>  {
-                            println!("Connection failed! What to do... {:?}", e);
-                        }
-                    }
-                }
+                let bind_address = "0.0.0.0:".to_string() + block.port.to_string().as_str();
+                Server::http(bind_address).unwrap().handle(request_handler).unwrap();
+                // let listener = TcpListener::bind(&bind_address).unwrap();
+                // println!("Server listening on Port {}", bind_address);
+                //
+                // for stream in listener.incoming() {
+                //     match stream {
+                //         Ok(stream) => {
+                //             handle_client(stream, &block);
+                //         }
+                //         Err(e) =>  {
+                //             println!("Connection failed! What to do... {:?}", e);
+                //         }
+                //     }
+                // }
             }
         ).unwrap());
     }
