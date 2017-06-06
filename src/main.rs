@@ -5,9 +5,9 @@ extern crate hyper;
 #[macro_use]
 extern crate serde_derive;
 
-use std::io::{Read, Write, BufReader, BufRead};
-use std::net::{TcpListener, TcpStream};
-use std::fs::File;
+use std::io::{Read, Write, BufReader, BufRead, copy};
+use std::net::{TcpStream};
+use std::fs::{File};
 use config_loader::server_block::{AccumulatedServerBlock};
 use std::thread;
 use hyper::server::{Server, Request, Response};
@@ -25,9 +25,38 @@ fn request_handler (req: Request, mut res: Response) {
         _ => "".to_string()
     };
 
-    println!("path {:?}", path);
+    // This needs to consider base path
+    match path_match(path) {
+        Ok(file) => {
+            let is_file = file.metadata().unwrap().is_file();
+            match is_file {
+                true => {
+                    let mut buf_reader = BufReader::new(file);
+                    copy(&mut buf_reader, &mut res.start().unwrap()).unwrap();
+                }
+                false => {
+                    *res.status_mut() = StatusCode::NotFound
+                }
+            }
+        },
+        Err(_) => {
+            *res.status_mut() = StatusCode::NotFound
+        }
+    }
+}
 
-    *res.status_mut() = StatusCode::Ok
+/// Return a Result<file buffer> or Error(String) to the request handler based on the existence of
+/// the file
+fn path_match (path: String) -> Result<File, String> {
+    match File::open(path) {
+        Ok(file) => {
+            Result::Ok(file)
+        }
+        _ => {
+            println!("File does not exist");
+            Result::Err("File does not exist".to_string())
+        }
+    }
 }
 
 fn main() {
