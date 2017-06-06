@@ -3,7 +3,8 @@ pub struct ServerBlock {
     pub port: u32,
     pub source: String,
     pub root: String,
-    pub base: String
+    pub base: String,
+    pub host: String
 }
 
 #[derive(Debug)]
@@ -41,9 +42,9 @@ mod tests {
 
     #[test]
     fn accumulated_server_block_correctly_aggregates() {
-        let first_block = ServerBlock { port: 100, source: "xa".to_string(), root: "ya".to_string(), base: "za".to_string() };
-        let second_block = ServerBlock { port: 100, source: "xb".to_string(), root: "yb".to_string(), base: "zb".to_string() };
-        let third_block = ServerBlock { port: 200, source: "xc".to_string(), root: "yc".to_string(), base: "zc".to_string() };
+        let first_block = ServerBlock { port: 100, source: "xa".to_string(), root: "ya".to_string(), base: "za".to_string(), host: "localhost".to_string() };
+        let second_block = ServerBlock { port: 100, source: "xb".to_string(), root: "yb".to_string(), base: "zb".to_string(), host: "localhost".to_string() };
+        let third_block = ServerBlock { port: 200, source: "xc".to_string(), root: "yc".to_string(), base: "zc".to_string(), host: "localhost".to_string() };
         let mut test_vec = Vec::new();
         test_vec.push(first_block);
         test_vec.push(second_block);

@@ -13,17 +13,31 @@ use std::thread;
 use hyper::server::{Server, Request, Response};
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri::{AbsolutePath};
+use hyper::header::Host;
 
 mod response;
 mod config_loader;
 
-fn request_handler (req: Request, mut res: Response) {
+fn request_handler (req: Request, mut res: Response, config: &AccumulatedServerBlock) {
     let uri = req.uri;
+
+    // We probably should match this Option, but will need to create a default Host header val
+    let domain = req.headers.get::  <Host>().unwrap();
+    let hostname = &domain.hostname;
+    println!("{:?}", hostname);
 
     let path = match uri {
         AbsolutePath(x) => x,
         _ => "".to_string()
     };
+
+    // Now that we know the domain, we perform a find over the accumulated server block on Host to get
+    // the correct source path
+    let mut iter = config.blocks.iter();
+    let block_match = iter.find(|&b| b.host == hostname.as_str()).unwrap();
+
+    println!("{:?}", block_match.base);
+    println!("{:?}", block_match.source);
 
     // This needs to consider base path
     match path_match(path) {
@@ -68,7 +82,9 @@ fn main() {
         children.push(thread::Builder::new().name("Oxidize-Server-Port-".to_string() + block.port.to_string().as_str())
             .spawn(move || {
                 let bind_address = "0.0.0.0:".to_string() + block.port.to_string().as_str();
-                Server::http(bind_address).unwrap().handle(request_handler).unwrap();
+                Server::http(bind_address).unwrap().handle(move |mut req: Request, mut res: Response| {
+                    request_handler(req, res, &block)
+                }).unwrap();
                 // let listener = TcpListener::bind(&bind_address).unwrap();
                 // println!("Server listening on Port {}", bind_address);
                 //
