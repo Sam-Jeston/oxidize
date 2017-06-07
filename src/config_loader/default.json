@@ -1,7 +1,7 @@
 [
   {
     "port": 4000,
-    "source": "/Users/samjeston/Projects/rust/oxidize/demo_site",
+    "source": "/Users/samjeston/Projects/md3-frontend",
     "root": "/",
     "base": "index.html",
     "host": "localhost"
