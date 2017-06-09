@@ -1,13 +1,15 @@
 use std::env;
-use std::fs::File;
 use std::io::prelude::*;
 use serde_json;
 use config_loader::server_block::{ServerBlock, AccumulatedServerBlock, accumlated_server_blocks};
+use fs_wrapper;
 
 pub mod server_block;
 
 fn read_file(file_path: String) -> String {
-    match File::open(file_path) {
+    // I appreciate the FS::open wrapper looks pointless, but I may want to handle things in that mod
+    // directly
+    match fs_wrapper::file_match(file_path) {
         Ok(mut file) => {
             let mut contents = String::new();
             file.read_to_string(&mut contents).unwrap();
@@ -39,7 +41,7 @@ pub fn load () -> Vec<AccumulatedServerBlock> {
         }
         None => {
             // TODO: This clearly not a long term solution
-            let file_string = read_file("/Users/samjeston/Projects/rust/oxidize/src/config_loader/default.json".to_string());
+            let file_string = read_file("/home/dev/Projects/rust/oxidize/src/config_loader/default.json".to_string());
             let raw_blocks = json_parser(file_string);
             accumlated_server_blocks(raw_blocks)
         }
