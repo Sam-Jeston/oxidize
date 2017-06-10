@@ -7,7 +7,7 @@ use hyper::status::StatusCode;
 use response;
 use fs_wrapper;
 
-pub fn handle (req: Request, mut res: Response, config: &AccumulatedServerBlock) {
+pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
     let uri = req.uri;
 
     // We probably should match this Option, but will need to create a default Host header val
@@ -30,6 +30,23 @@ pub fn handle (req: Request, mut res: Response, config: &AccumulatedServerBlock)
 
     let absolute_path = block_match.source.clone() + path.as_str();
 
+    // TODO: Here we will match against the Optinal upstream, and see if our path matches the absolute path
+    // and will instead redirect to the new upstream
+    match block_match.upstreams {
+        Some(ref u) => {
+            println!("Upstreams found");
+
+            // TODO: Check if the absolute path matches the upstream. If it does, redirect, if it doesnt,
+            // serve the file
+            serve_file(absolute_path, res)
+        },
+        None => {
+            serve_file(absolute_path, res)
+        }
+    }
+}
+
+fn serve_file (absolute_path: String, mut res: Response) {
     // This needs to consider base path
     match fs_wrapper::file_match(absolute_path) {
         Ok(file) => {
