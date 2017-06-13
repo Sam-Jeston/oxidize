@@ -1,7 +1,7 @@
 [
   {
     "port": 4000,
-    "source": "/home/dev/Projects/rust/oxidize/demo_site",
+    "source": "/Users/samjeston/Projects/rust/oxidize/demo_site",
     "root": "/",
     "base": "index.html",
     "host": "localhost",
@@ -15,7 +15,7 @@
   },
   {
     "port": 4555,
-    "source": "/home/dev/Projects/rust/oxidize/demo_site",
+    "source": "/Users/samjeston/Projects/rust/oxidize/demo_site",
     "root": "/",
     "base": "index.html",
     "host": "localhost"

@@ -1,11 +1,16 @@
 use hyper::server::{Request, Response};
-use config_loader::server_block::{AccumulatedServerBlock};
+use config_loader::server_block::{AccumulatedServerBlock, UpstreamOption};
 use hyper::header::Host;
 use hyper::uri::RequestUri::{AbsolutePath};
 use std::io::{BufReader, copy};
 use hyper::status::StatusCode;
 use response;
 use fs_wrapper;
+
+pub struct UpstreamRate<'a> {
+    pub byte_matches: i32,
+    pub upstream_option: &'a UpstreamOption
+}
 
 pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
     let uri = req.uri;
@@ -24,6 +29,9 @@ pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
     let mut iter = config.blocks.iter();
     let block_match = iter.find(|&b| b.host == hostname.as_str()).unwrap();
 
+    // We will use this for our upstreams, and as such need a copy of the original path
+    let path_ref = path.clone();
+
     if path == "/" {
         path = "/".to_string() + block_match.base.clone().as_str();
     }
@@ -36,6 +44,30 @@ pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
         Some(ref u) => {
             println!("Upstreams found");
 
+            // Let's iterate each upstream, and then compare byte by byte, we will want to score
+            // each entry on number of byte matches, and then once that is done, do a character
+            // comparison to make sure we actually have a valid match
+            let original_path_bytes = path_ref.as_bytes();
+            println!("path ref bytes {:?}", original_path_bytes);
+
+            let upstream_ratings: Vec<UpstreamRate> = u.iter().map(|upstream| {
+                let upstream_bytes = upstream.source_path.as_bytes();
+
+                let mut matches: i32 = 0;
+                for (i, b) in upstream_bytes.iter().enumerate() {
+                    println!("b and i {:?} {:?}", b, i);
+                    if b == &original_path_bytes[i] {
+                        matches = matches + 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                println!("matches {:?}", matches);
+
+                UpstreamRate { byte_matches: matches, upstream_option: upstream}
+            }).collect();
+
             // TODO: Check if the absolute path matches the upstream. If it does, redirect, if it doesnt,
             // serve the file
             serve_file(absolute_path, res)
@@ -47,7 +79,6 @@ pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
 }
 
 fn serve_file (absolute_path: String, mut res: Response) {
-    // This needs to consider base path
     match fs_wrapper::file_match(absolute_path) {
         Ok(file) => {
             let is_file = file.metadata().unwrap().is_file();

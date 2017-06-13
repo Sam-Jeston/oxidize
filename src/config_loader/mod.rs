@@ -41,7 +41,7 @@ pub fn load () -> Vec<AccumulatedServerBlock> {
         }
         None => {
             // TODO: This clearly not a long term solution
-            let file_string = read_file("/home/dev/Projects/rust/oxidize/src/config_loader/default.json".to_string());
+            let file_string = read_file("/Users/samjeston/Projects/rust/oxidize/src/config_loader/default.json".to_string());
             let raw_blocks = json_parser(file_string);
             accumlated_server_blocks(raw_blocks)
         }
