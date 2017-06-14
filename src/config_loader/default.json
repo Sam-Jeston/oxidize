@@ -10,6 +10,11 @@
         "target_host": "locahost:4555",
         "source_path": "/redirect",
         "destination_path": "/"
+      },
+      {
+        "target_host": "locahost:4555",
+        "source_path": "/faker",
+        "destination_path": "/"
       }
     ]
   },

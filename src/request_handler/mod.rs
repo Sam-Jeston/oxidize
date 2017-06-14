@@ -36,26 +36,25 @@ pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
         path = "/".to_string() + block_match.base.clone().as_str();
     }
 
-    let absolute_path = block_match.source.clone() + path.as_str();
-
     // TODO: Here we will match against the Optinal upstream, and see if our path matches the absolute path
     // and will instead redirect to the new upstream
     match block_match.upstreams {
         Some(ref u) => {
-            println!("Upstreams found");
-
             // Let's iterate each upstream, and then compare byte by byte, we will want to score
             // each entry on number of byte matches, and then once that is done, do a character
             // comparison to make sure we actually have a valid match
             let original_path_bytes = path_ref.as_bytes();
-            println!("path ref bytes {:?}", original_path_bytes);
 
-            let upstream_ratings: Vec<UpstreamRate> = u.iter().map(|upstream| {
+            let best_upstream: UpstreamRate = u.iter().map(|upstream| {
                 let upstream_bytes = upstream.source_path.as_bytes();
 
                 let mut matches: i32 = 0;
+                let original_len_ref = original_path_bytes.len();
                 for (i, b) in upstream_bytes.iter().enumerate() {
-                    println!("b and i {:?} {:?}", b, i);
+                    if original_len_ref <= i {
+                        break;
+                    }
+
                     if b == &original_path_bytes[i] {
                         matches = matches + 1;
                     } else {
@@ -63,16 +62,51 @@ pub fn handle (req: Request, res: Response, config: &AccumulatedServerBlock) {
                     }
                 }
 
-                println!("matches {:?}", matches);
-
                 UpstreamRate { byte_matches: matches, upstream_option: upstream}
-            }).collect();
+            }).max_by_key(|upstream| upstream.byte_matches).unwrap();
 
-            // TODO: Check if the absolute path matches the upstream. If it does, redirect, if it doesnt,
-            // serve the file
-            serve_file(absolute_path, res)
+            println!("best upstream info. Matches: {:?}, path: {:?}", best_upstream.byte_matches, best_upstream.upstream_option.source_path);
+
+            // Okay so now, lets split our strings on "/". Then see if we have any actual matches
+            // on path words
+            let upsteam_path_split: Vec<&str> = best_upstream.upstream_option.source_path.split("/").collect();
+            let current_path_split: Vec<&str> = path_ref.split("/").collect();
+
+            let upstream_len_ref = upsteam_path_split.len();
+
+            let mut exact_match = false;
+            for (i, path_word) in current_path_split.iter().enumerate() {
+                if upstream_len_ref <= i {
+                    break;
+                }
+
+                if path_word == &upsteam_path_split[i] {
+                    if upstream_len_ref == i + 1 {
+                        exact_match = true;
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            println!("Exact match? {:?}", exact_match);
+
+            if exact_match {
+                let custom_end_path: Vec<&str> = path_ref.split(best_upstream.upstream_option.source_path.as_str()).collect();
+                let absolute_path = best_upstream.upstream_option.destination_path.clone() + custom_end_path[1];
+
+                println!("{:?}", custom_end_path[1]);
+
+                let absolute_path = block_match.source.clone() + path.as_str();
+                serve_file(absolute_path, res)
+            } else {
+                let absolute_path = block_match.source.clone() + path.as_str();
+                serve_file(absolute_path, res)
+            }
         },
         None => {
+            let absolute_path = block_match.source.clone() + path.as_str();
             serve_file(absolute_path, res)
         }
     }
