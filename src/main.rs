@@ -1,12 +1,13 @@
 extern crate serde;
 extern crate serde_json;
 extern crate hyper;
+extern crate futures;
 
 #[macro_use]
 extern crate serde_derive;
 
 use std::thread;
-use hyper::server::{Server, Request, Response};
+use hyper::server::{Http, Request, Response, Service};
 
 mod response;
 mod config_loader;
@@ -21,10 +22,9 @@ fn main() {
     for block in accumulated_server_blocks {
         children.push(thread::Builder::new().name("Oxidize-Server-Port-".to_string() + block.port.to_string().as_str())
             .spawn(move || {
-                let bind_address = "0.0.0.0:".to_string() + block.port.to_string().as_str();
-                Server::http(bind_address).unwrap().handle(move |req: Request, res: Response| {
-                    request_handler::handle(req, res, &block)
-                }).unwrap();
+                let bind_address = ("0.0.0.0:".to_string() + block.port.to_string().as_str()).parse().unwrap();
+                let server = Http::new().bind(&bind_address, || Ok(request_handler::AsyncHandler)).unwrap();
+                server.run().unwrap();
             }
         ).unwrap());
     }
