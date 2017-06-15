@@ -16,7 +16,10 @@ pub struct UpstreamRate<'a> {
     pub upstream_option: &'a UpstreamOption
 }
 
-pub struct AsyncHandler;
+#[derive(Debug, Clone)]
+pub struct AsyncHandler {
+    pub accumulated_server_block: AccumulatedServerBlock
+}
 
 impl Service for AsyncHandler {
     type Request = Request;
@@ -36,8 +39,8 @@ impl Service for AsyncHandler {
 
         // Now that we know the domain, we perform a find over the accumulated server block on Host to get
         // the correct source path
-        let mut iter = config.blocks.iter();
-        let block_match = iter.find(|&b| b.host == hostname).unwrap();
+        let mut iter = &self.accumulated_server_block.blocks.iter();
+        let ref block_match = iter.find(|&b| b.host == hostname.to_string()).unwrap();
 
         // We will use this for our upstreams, and as such need a copy of the original path
         let path_ref = path.clone();

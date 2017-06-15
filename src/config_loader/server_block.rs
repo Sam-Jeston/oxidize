@@ -1,4 +1,4 @@
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ServerBlock {
     pub port: u32,
     pub source: String,
@@ -8,14 +8,14 @@ pub struct ServerBlock {
     pub upstreams: Option<Vec<UpstreamOption>>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpstreamOption {
     pub target_host: String,
     pub source_path: String,
     pub destination_path: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AccumulatedServerBlock {
     pub port: u32,
     pub blocks: Vec<ServerBlock>
