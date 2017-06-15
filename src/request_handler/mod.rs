@@ -31,22 +31,25 @@ impl Service for AsyncHandler {
     fn call(&self, req: Request) -> Self::Future {
         let mut response = Response::new();
 
-        let mut path = req.uri().path();
-
         // We probably should match this Option, but will need to create a default Host header val
         let domain = req.headers().get::<Host>().unwrap();
         let hostname = &domain.hostname();
 
         // Now that we know the domain, we perform a find over the accumulated server block on Host to get
         // the correct source path
-        let mut iter = &self.accumulated_server_block.blocks.iter();
-        let ref block_match = iter.find(|&b| b.host == hostname.to_string()).unwrap();
+        let target_blocks = &self.accumulated_server_block.blocks.clone();
+        let mut iter = target_blocks.iter();
+        let ref block_match = iter.find(|&b| &b.host == &hostname.to_string()).unwrap();
+
+        let block_match_base = block_match.base.clone();
+        let block_match_str = block_match_base.as_str();
+        let default_path = "/".to_string() + block_match_str;
+        let mut path = req.uri().path();
 
         // We will use this for our upstreams, and as such need a copy of the original path
         let path_ref = path.clone();
-
         if path == "/" {
-            path = ("/".to_string() + block_match.base.clone().as_str()).as_str();
+            path = default_path.as_str();
         }
 
         // TODO: Here we will match against the Optinal upstream, and see if our path matches the absolute path
@@ -111,16 +114,15 @@ impl Service for AsyncHandler {
 
                     println!("{:?}", custom_end_path[1]);
 
-                    let absolute_path = block_match.source.clone() + path;
-                    serve_file(absolute_path, response);
+                    serve_file(absolute_path, &mut response);
                 } else {
                     let absolute_path = block_match.source.clone() + path;
-                    serve_file(absolute_path, response);
+                    serve_file(absolute_path, &mut response);
                 }
             },
             None => {
                 let absolute_path = block_match.source.clone() + path;
-                serve_file(absolute_path, response);
+                serve_file(absolute_path, &mut response);
             }
         }
 
@@ -128,9 +130,9 @@ impl Service for AsyncHandler {
     }
 }
 
-fn serve_file (absolute_path: String, mut response: Response) {
+fn serve_file (absolute_path: String, response: &mut Response) {
     match fs_wrapper::file_match(absolute_path) {
-        Ok(file) => {
+        Ok(mut file) => {
             let is_file = file.metadata().unwrap().is_file();
             match is_file {
                 true => {
@@ -146,17 +148,13 @@ fn serve_file (absolute_path: String, mut response: Response) {
                 }
                 false => {
                     response.set_status(StatusCode::NotFound);
-                    let not_found = response::not_found();
-                    let response_bytes = not_found.as_bytes();
-                    response.set_body(response_bytes);
+                    response.set_body(response::not_found());
                 }
             }
         },
         Err(_) => {
             response.set_status(StatusCode::NotFound);
-            let not_found = response::not_found();
-            let response_bytes = not_found.as_bytes();
-            response.set_body(response_bytes);
+            response.set_body(response::not_found());
         }
     }
 }
