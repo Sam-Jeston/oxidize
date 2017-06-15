@@ -33,7 +33,7 @@ fn main() {
                     let handler = AsyncHandler {
                         accumulated_server_block: block.clone(),
                         hyper_client: client,
-                        client_core: core
+                        handle: core.handle().clone()
                     };
 
                     Ok(handler)

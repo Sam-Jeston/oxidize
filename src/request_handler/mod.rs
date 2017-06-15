@@ -1,7 +1,7 @@
 use hyper::server::{Request, Response, Service};
 use config_loader::server_block::{AccumulatedServerBlock, UpstreamOption};
 use hyper::header::Host;
-use hyper::{StatusCode, Error, Client, Method};
+use hyper::{StatusCode, Error, Client};
 use hyper::client;
 use futures::{future, Future};
 use tokio_core::reactor;
@@ -18,7 +18,7 @@ pub struct UpstreamRate<'a> {
 pub struct AsyncHandler {
     pub accumulated_server_block: AccumulatedServerBlock,
     pub hyper_client: Client<client::HttpConnector>,
-    pub client_core: reactor::Core
+    pub handle: reactor::Handle
 }
 
 impl Service for AsyncHandler {
@@ -27,7 +27,7 @@ impl Service for AsyncHandler {
     type Error = Error;
     type Future = future::FutureResult<Self::Response, Self::Error>;
 
-    fn call(&self, mut req: Request) -> Self::Future {
+    fn call(&self, req: Request) -> Self::Future {
         let mut res = Response::new();
 
         // We probably should match this Option, but will need to create a default Host header val
@@ -111,6 +111,7 @@ impl Service for AsyncHandler {
 
                     forward_request(
                         &self.hyper_client,
+                        &self.handle,
                         absolute_path,
                         &mut res,
                         &req
@@ -159,8 +160,10 @@ fn serve_file (absolute_path: String, response: &mut Response) {
     }
 }
 
+// Useful code https://github.com/hyperium/hyper/pull/1179/files
 fn forward_request (
     hyper_client: &Client<client::HttpConnector>,
+    el_handle: &reactor::Handle,
     path: String,
     response: &mut Response,
     original_request: &Request
@@ -172,22 +175,20 @@ fn forward_request (
     // We also need to read the request body, and do some mut header work like so
     // let mut request_headers = request.headers_mut();
     // request_headers = original_request.headers_mut();
-    println!("Where we going {:?}", uri);
-    let request: Request = Request::new(Method::Get, uri);
+    let method = original_request.method().clone();
+    let mut request: Request = Request::new(method, uri);
+    request.headers_mut().extend(original_request.headers().iter());
 
-    let work = hyper_client.request(request).and_then(|res| {
-        println!("Does the request return??");
+    // TODO: This line looks about right but has borrow issues
+    // request.set_body(original_request.body());
+
+    // TODO: Creating an event loop for each proxied request, surely this is the wrong way to do this
+    let mut core = reactor::Core::new().unwrap();
+    let client = Client::configure().keep_alive(true).build(&core.handle());
+
+    let work = client.request(request).and_then(|res| {
         Ok(response.set_body(res.body()))
-        // res.body().collect()
-
-        // for_each(|chunk| {
-        //     response.set_body(chunk)
-        // })
-
-        // .for_each(|chunk| {
-        //        response.set_body(chunk);
-        // })
     });
 
-    reactor::Core::new().unwrap().run(work).unwrap();
+    core.run(work).unwrap();
 }
