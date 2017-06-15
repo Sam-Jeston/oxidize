@@ -1,13 +1,9 @@
-use hyper::server::{Request, Response};
+use hyper::server::{Request, Response, Service};
 use config_loader::server_block::{AccumulatedServerBlock, UpstreamOption};
 use hyper::header::Host;
-use std::io::{BufReader, copy};
-use hyper::{StatusCode};
-use hyper::server::{Service};
-use hyper::Error;
+use hyper::{StatusCode, Error};
 use futures::future;
 use std::io::{Read};
-use std::fs::File;
 use response;
 use fs_wrapper;
 
@@ -29,7 +25,7 @@ impl Service for AsyncHandler {
     type Future = future::FutureResult<Self::Response, Self::Error>;
 
     fn call(&self, req: Request) -> Self::Future {
-        let mut response = Response::new();
+        let mut res = Response::new();
 
         // We probably should match this Option, but will need to create a default Host header val
         let domain = req.headers().get::<Host>().unwrap();
@@ -106,27 +102,25 @@ impl Service for AsyncHandler {
                     }
                 }
 
-                println!("Exact match? {:?}", exact_match);
-
                 if exact_match {
                     let custom_end_path: Vec<&str> = path_ref.split(best_upstream.upstream_option.source_path.as_str()).collect();
                     let absolute_path = best_upstream.upstream_option.destination_path.clone() + custom_end_path[1];
 
-                    println!("{:?}", custom_end_path[1]);
+                    println!("{:?}", absolute_path);
 
-                    serve_file(absolute_path, &mut response);
+                    serve_file(absolute_path, &mut res);
                 } else {
                     let absolute_path = block_match.source.clone() + path;
-                    serve_file(absolute_path, &mut response);
+                    serve_file(absolute_path, &mut res);
                 }
             },
             None => {
                 let absolute_path = block_match.source.clone() + path;
-                serve_file(absolute_path, &mut response);
+                serve_file(absolute_path, &mut res);
             }
         }
 
-        future::ok(response)
+        future::ok(res)
     }
 }
 

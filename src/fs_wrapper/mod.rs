@@ -4,7 +4,7 @@ use std::fs::File;
 /// the file
 pub fn file_match (path: String) -> Result<File, String> {
     match File::open(path) {
-        Ok(mut file) => {
+        Ok(file) => {
             Result::Ok(file)
         }
         _ => {
