@@ -1,8 +1,10 @@
 use hyper::server::{Request, Response, Service};
 use config_loader::server_block::{AccumulatedServerBlock, UpstreamOption};
 use hyper::header::Host;
-use hyper::{StatusCode, Error};
-use futures::future;
+use hyper::{StatusCode, Error, Client, Method};
+use hyper::client;
+use futures::{future, Future};
+use tokio_core::reactor;
 use std::io::{Read};
 use response;
 use fs_wrapper;
@@ -12,19 +14,20 @@ pub struct UpstreamRate<'a> {
     pub upstream_option: &'a UpstreamOption
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AsyncHandler {
-    pub accumulated_server_block: AccumulatedServerBlock
+    pub accumulated_server_block: AccumulatedServerBlock,
+    pub hyper_client: Client<client::HttpConnector>,
+    pub client_core: reactor::Core
 }
 
 impl Service for AsyncHandler {
     type Request = Request;
     type Response = Response;
     type Error = Error;
-
     type Future = future::FutureResult<Self::Response, Self::Error>;
 
-    fn call(&self, req: Request) -> Self::Future {
+    fn call(&self, mut req: Request) -> Self::Future {
         let mut res = Response::new();
 
         // We probably should match this Option, but will need to create a default Host header val
@@ -77,8 +80,6 @@ impl Service for AsyncHandler {
                     UpstreamRate { byte_matches: matches, upstream_option: upstream}
                 }).max_by_key(|upstream| upstream.byte_matches).unwrap();
 
-                println!("best upstream info. Matches: {:?}, path: {:?}", best_upstream.byte_matches, best_upstream.upstream_option.source_path);
-
                 // Okay so now, lets split our strings on "/". Then see if we have any actual matches
                 // on path words
                 let upsteam_path_split: Vec<&str> = best_upstream.upstream_option.source_path.split("/").collect();
@@ -104,11 +105,16 @@ impl Service for AsyncHandler {
 
                 if exact_match {
                     let custom_end_path: Vec<&str> = path_ref.split(best_upstream.upstream_option.source_path.as_str()).collect();
-                    let absolute_path = best_upstream.upstream_option.destination_path.clone() + custom_end_path[1];
-
+                    let custom_path = best_upstream.upstream_option.destination_path.clone() + custom_end_path[1];
+                    let absolute_path = best_upstream.upstream_option.target_host.clone() + custom_path.as_str();
                     println!("{:?}", absolute_path);
 
-                    serve_file(absolute_path, &mut res);
+                    forward_request(
+                        &self.hyper_client,
+                        absolute_path,
+                        &mut res,
+                        &req
+                    );
                 } else {
                     let absolute_path = block_match.source.clone() + path;
                     serve_file(absolute_path, &mut res);
@@ -151,4 +157,37 @@ fn serve_file (absolute_path: String, response: &mut Response) {
             response.set_body(response::not_found());
         }
     }
+}
+
+fn forward_request (
+    hyper_client: &Client<client::HttpConnector>,
+    path: String,
+    response: &mut Response,
+    original_request: &Request
+) {
+    let uri = path.parse().unwrap();
+
+    // TODO: We need a type matcher here to take the referenced method and return non-ref as
+    // this is a ref original_request.method().
+    // We also need to read the request body, and do some mut header work like so
+    // let mut request_headers = request.headers_mut();
+    // request_headers = original_request.headers_mut();
+    println!("Where we going {:?}", uri);
+    let request: Request = Request::new(Method::Get, uri);
+
+    let work = hyper_client.request(request).and_then(|res| {
+        println!("Does the request return??");
+        Ok(response.set_body(res.body()))
+        // res.body().collect()
+
+        // for_each(|chunk| {
+        //     response.set_body(chunk)
+        // })
+
+        // .for_each(|chunk| {
+        //        response.set_body(chunk);
+        // })
+    });
+
+    reactor::Core::new().unwrap().run(work).unwrap();
 }
